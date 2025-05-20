@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #mazes {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            border: 2px solid #333;
+            background-color: #000;
+        }
+        
+        .maze-cell {
+            position: absolute;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #info {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        #instructions {
+            margin-top: 15px;
+            text-align: center;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Maze Game</h1>
+        <div id="mazes" tabindex="0"></div>
+        <div id="info">
+            <div id="mazeLevel">Level: 1</div>
+        </div>
+        <div class="controls">
+            <button id="mazePlayAgain">Start Over</button>
+            <button id="showSolution">Show Solution</button>
+        </div>
+        <div id="instructions">
+            <p>Use arrow keys to navigate through the maze. Start from the red block and reach the bottom right corner.</p>
+            <p>Press Tab to focus on the maze if controls don't respond.</p>
+        </div>
+    </div>
+
+    <script>
+        // Helper functions to match Code.org App Lab functions
+        function rgb(r, g, b) {
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        function button(id, text) {
+            const button = document.createElement('div');
+            button.id = id;
+            button.className = 'maze-cell';
+            button.textContent = text;
+            document.getElementById('mazes').appendChild(button);
+            return button;
+        }
+        
+        function setPosition(id, x, y, width, height) {
+            const element = document.getElementById(id);
+            element.style.left = x + 'px';
+            element.style.top = y + 'px';
+            element.style.width = width + 'px';
+            element.style.height = height + 'px';
+        }
+        
+        function setProperty(id, property, value) {
+            const element = document.getElementById(id);
+            if (property === 'background-color') {
+                element.style.backgroundColor = value;
+            } else if (property === 'border-radius') {
+                element.style.borderRadius = value + 'px';
+            } else if (property === 'border-width') {
+                element.style.borderWidth = value + 'px';
+            }
+        }
+        
+        function deleteElement(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.remove();
+            }
+        }
+        
+        function setText(id, text) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = text;
+            }
+        }
+        
+        function getProperty(id, property) {
+            const element = document.getElementById(id);
+            if (element) {
+                if (property === 'background-color') {
+                    return window.getComputedStyle(element).backgroundColor;
+                }
+            }
+            return null;
+        }
+        
+        function randomNumber(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        
+        // Maze game variables
+        var mazeLevel = 5;
+        var mazeRows = mazeLevel;
+        var mazeCols = mazeLevel;
+        var mazeCellSize = 320 / mazeRows;
+        var mazeCellId;
+        var mazeRow = 1;
+        var mazeCol = 1;
+        var mazeVisited = '|1,1|';
+        var mazeDirection;
+        var projectedCell;
+        var projectedRow;
+        var projectedCol;
+        var projectedWall;
+        var waysLeft = '1234';
+        var lastDirection  = [];
+        var logDirection = '';
+        var mazeStatus = '';
+        var mazeColor = rgb(255, 255, 255);
+        var pathColor = rgb(57, 255, 20);
+        var pathRow = 1;
+        var pathCol = 0;
+        var pathHighlight =  'rgb(255, 49, 49)';
+        var oldPathRow = 1;
+        var oldPathCol = 0;
+        var mazeBackgroundColor = 'rgb(0, 0, 0)';
+        var shortestPath = ['mazeCell1_0','mazeCell1_1'];
+        var recordShortestPath = true;
+        var allCells = [];
+
+        function mazeCell(row, col) {
+            return 'mazeCell' + row + '_' + col;
+        }
+
+        function mazeValid() {
+            return mazeVisited.indexOf(projectedCell) == -1 && 
+                   projectedRow > 0 && 
+                   projectedRow < mazeRows && 
+                   projectedCol > 0 && 
+                   projectedCol < mazeCols;
+        }
+
+        function resetMaze() {
+            for (var i = 0; i < allCells.length; i++) {
+                deleteElement(allCells[i]);
+            }
+            
+            mazeRows = mazeLevel;
+            mazeCols = mazeLevel;
+            mazeCellSize = 320 / mazeRows;
+            mazeCellId;
+            mazeRow = 1;
+            mazeCol = 1;
+            mazeVisited = '|1,1|';
+            waysLeft = '1234';
+            lastDirection = [];
+            logDirection = '';
+            mazeStatus = '';
+            mazeColor = rgb(255, 255, 255);
+            pathColor = rgb(57, 255, 20);
+            pathRow = 1;
+            pathCol = 0;
+            pathHighlight = 'rgb(255, 49, 49)';
+            oldPathRow = 1;
+            oldPathCol = 0;
+            mazeBackgroundColor = 'rgb(0, 0, 0)';
+            shortestPath = ['mazeCell1_0','mazeCell1_1'];
+            recordShortestPath = true;
+            allCells = [];
+        }
+
+        function generateMaze() {
+            for (var r = 0; r < mazeRows; r++) {
+                for (var c = 0; c < mazeCols; c++) {
+                    mazeCellId = "mazeCell" + r + "_" + c;
+                    button(mazeCellId, "");
+                    setPosition(mazeCellId, c * mazeCellSize, r * mazeCellSize, mazeCellSize, mazeCellSize);
+                    setProperty(mazeCellId, "border-radius", 0);
+                    setProperty(mazeCellId, "border-width", 0);
+                    setProperty(mazeCellId, "background-color", mazeBackgroundColor);
+                    allCells.push(mazeCellId);
+                }
+            }
+            
+            setProperty(mazeCell(1, 1), "background-color", mazeColor);
+            setProperty(mazeCell(1, 0), "background-color", pathHighlight);
+            setProperty(mazeCell(mazeRows - 1, mazeCols - 2), "background-color", mazeColor);
+            
+            while (mazeStatus !== 'made') {
+                if (waysLeft == '') {
+                    waysLeft = '1234';
+                    
+                    if (lastDirection.length == 0) { 
+                        mazeStatus = 'made';
+                    } else if (lastDirection[lastDirection.length - 1] == 'u') {
+                        mazeRow += 2;
+                        lastDirection.pop();
+                        if (recordShortestPath == true) {
+                            shortestPath.pop();
+                            shortestPath.pop();
+                        }
+                    } else if (lastDirection[lastDirection.length - 1] == 'r') {
+                        mazeCol -= 2;
+                        lastDirection.pop();
+                        if (recordShortestPath == true) {
+                            shortestPath.pop();
+                            shortestPath.pop();
+                        }
+                    } else if (lastDirection[lastDirection.length - 1] == 'd') {
+                        mazeRow -= 2;
+                        lastDirection.pop();
+                        if (recordShortestPath == true) {
+                            shortestPath.pop();
+                            shortestPath.pop();
+                        }
+                    } else if (lastDirection[lastDirection.length - 1] == 'l') {
+                        mazeCol += 2;
+                        lastDirection.pop();
+                        if (recordShortestPath == true) {
+                            shortestPath.pop();
+                            shortestPath.pop();
+                        }
+                    }
+                }
+                
+                mazeDirection = randomNumber(0, waysLeft.length - 1);
+                if (waysLeft[mazeDirection] == 1) {
+                    projectedCol = mazeCol;
+                    projectedRow = mazeRow - 2;
+                    projectedCell = '|' + projectedRow + ',' + projectedCol + '|';
+                    projectedWall = mazeCell(mazeRow - 1, mazeCol);
+                    waysLeft = waysLeft.replace(1, '');
+                    logDirection = 'u';
+                } else if (waysLeft[mazeDirection] == 2) {
+                    projectedCol = mazeCol + 2;
+                    projectedRow = mazeRow;
+                    projectedCell = '|' + projectedRow + ',' + projectedCol + '|';
+                    projectedWall = mazeCell(mazeRow, mazeCol + 1);
+                    waysLeft = waysLeft.replace(2, '');
+                    logDirection = 'r';
+                } else if (waysLeft[mazeDirection] == 3) {
+                    projectedCol = mazeCol;
+                    projectedRow = mazeRow + 2;
+                    projectedCell = '|' + projectedRow + ',' + projectedCol + '|';
+                    projectedWall = mazeCell(mazeRow + 1, mazeCol);
+                    waysLeft = waysLeft.replace(3, '');
+                    logDirection = 'd';
+                } else if (waysLeft[mazeDirection] == 4) {
+                    projectedCol = mazeCol - 2;
+                    projectedRow = mazeRow;
+                    projectedCell = '|' + projectedRow + ',' + projectedCol + '|';
+                    projectedWall = mazeCell(mazeRow, mazeCol - 1);
+                    waysLeft = waysLeft.replace(4, '');
+                    logDirection = 'l';
+                }
+                
+                if (mazeValid()) {
+                    setProperty(mazeCell(projectedRow, projectedCol), "background-color", mazeColor);
+                    setProperty(projectedWall, "background-color", mazeColor);
+                    mazeRow = projectedRow;
+                    mazeCol = projectedCol;
+                    mazeVisited = mazeVisited + projectedCell;
+                    waysLeft = '1234';
+                    lastDirection.push(logDirection);
+                    if (recordShortestPath == true) {
+                        shortestPath.push(projectedWall);
+                        shortestPath.push(mazeCell(mazeRow, mazeCol));
+                    }
+                    
+                    if (mazeCell(mazeRow, mazeCol) == mazeCell(mazeRows - 2, mazeCols - 2)) {
+                        shortestPath.push(mazeCell(mazeRows - 1, mazeCols - 2));
+                        recordShortestPath = false;
+                    }
+                }
+            }
+        }
+
+        function displayShortestPath() {
+            mazeStatus = 'solution';
+            
+            for (var r = 0; r < allCells.length; r++) {
+                if (getProperty(allCells[r], "background-color") == pathHighlight) {
+                    setProperty(allCells[r], "background-color", pathColor);
+                }
+            }
+            
+            for (var i = 0; i < shortestPath.length; i++) {
+                setProperty(shortestPath[i], "background-color", "blue");
+            }
+        }
+
+        // Set up event listeners
+        document.getElementById('mazes').addEventListener('keydown', function(event) {
+            if (mazeStatus == 'made') {
+                if (event.key == 'ArrowUp') {
+                    if (pathRow > 0 && getProperty(mazeCell(pathRow - 1, pathCol), 'background-color') !== mazeBackgroundColor) {
+                        oldPathRow = pathRow;
+                        oldPathCol = pathCol;
+                        pathRow = pathRow - 1;
+                    }
+                } else if (event.key == 'ArrowRight') {
+                    if (pathCol < mazeRows - 1 && getProperty(mazeCell(pathRow, pathCol + 1), 'background-color') !== mazeBackgroundColor) {
+                        oldPathRow = pathRow;
+                        oldPathCol = pathCol;
+                        pathCol = pathCol + 1;
+                    }
+                } else if (event.key == 'ArrowDown') {
+                    if (pathRow < mazeCols - 1 && getProperty(mazeCell(pathRow + 1, pathCol), 'background-color') !== mazeBackgroundColor) {
+                        oldPathRow = pathRow;
+                        oldPathCol = pathCol;
+                        pathRow = pathRow + 1;
+                    }
+                } else if (event.key == 'ArrowLeft') {
+                    if (pathCol > 0 && getProperty(mazeCell(pathRow, pathCol - 1), 'background-color') !== mazeBackgroundColor) {
+                        oldPathRow = pathRow;
+                        oldPathCol = pathCol;
+                        pathCol = pathCol - 1;
+                    }
+                }
+                setProperty(mazeCell(pathRow, pathCol), 'background-color', pathHighlight);
+                setProperty(mazeCell(oldPathRow, oldPathCol), 'background-color', pathColor);
+                if (getProperty(mazeCell(mazeRows - 1, mazeCols - 2), "background-color") == pathHighlight) {
+                    mazeStatus = 'finished';
+                    mazeLevel += 6;
+                    setText("mazeLevel", 'Level: ' + (((mazeLevel - 5) / 6) + 1));
+                    resetMaze();
+                    generateMaze();
+                }
+            }
+        });
+
+        document.getElementById('mazePlayAgain').addEventListener('click', function() {
+            mazeLevel = 5;
+            setText("mazeLevel", 'Level: 1');
+            resetMaze();
+            generateMaze();
+        });
+
+        document.getElementById('showSolution').addEventListener('click', function() {
+            displayShortestPath();
+        });
+
+        // Initialize the maze
+        generateMaze();
+
+        // Make sure the maze can get keyboard focus
+        document.getElementById('mazes').focus();
+    </script>
+</body>
+</html>
